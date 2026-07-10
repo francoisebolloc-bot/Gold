@@ -1,21 +1,44 @@
 """
 Client centralisé pour tous les appels à l'IA — utilise Google Gemini (gratuit, sans carte).
 Interface simple : ask_ai() et ask_ai_json().
-n'aient pas besoin d'être réécrits : ask_ai() et ask_ai_json().
+
+Google retire/renomme régulièrement ses modèles, parfois sans préavis clair (ex.
+gemini-2.5-flash-lite qui a renvoyé des 404 du jour au lendemain le 9 juillet 2026 alors
+que sa date de retrait officielle était le 22 juillet 2026). Pour éviter que tout le bot
+tombe en panne à chaque fois que Google change ses modèles, on essaie GEMINI_MODEL en
+premier, puis une liste de secours dans l'ordre. Le premier qui répond avec succès (pas de
+404) est utilisé pour l'appel.
 """
+import logging
 import json
 import httpx
 from app.config import GEMINI_API_KEY, GEMINI_MODEL
 
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{{model}}:generateContent"
+logger = logging.getLogger("gold-bot")
+
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+# Modèles de secours essayés dans l'ordre si GEMINI_MODEL échoue avec un 404
+# (modèle retiré/renommé côté Google). "gemini-flash-lite-latest" est un alias
+# maintenu par Google qui pointe toujours vers un modèle Flash-Lite valide,
+# donc il sert de filet de sécurité en dernier recours.
+FALLBACK_MODELS = [
+    "gemini-3.1-flash-lite",
+    "gemini-flash-lite-latest",
+]
 
 
 async def ask_ai(system_prompt: str, user_prompt: str, max_tokens: int = 600) -> str:
-    """Appelle Gemini et retourne le texte brut de la réponse."""
+    """Appelle Gemini et retourne le texte brut de la réponse.
+
+    Essaie GEMINI_MODEL, puis chaque modèle de FALLBACK_MODELS si le précédent
+    renvoie un 404 (modèle indisponible/retiré). Toute autre erreur (429, 500,
+    clé invalide, etc.) est immédiatement relancée sans essayer les fallbacks,
+    car changer de modèle ne résoudrait pas ces problèmes-là.
+    """
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY manquante dans les variables d'environnement")
 
-    url = GEMINI_URL.format(model=GEMINI_MODEL)
     headers = {"x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json"}
     payload = {
         "system_instruction": {"parts": [{"text": system_prompt}]},
@@ -23,10 +46,34 @@ async def ask_ai(system_prompt: str, user_prompt: str, max_tokens: int = 600) ->
         "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.4},
     }
 
+    models_to_try = [GEMINI_MODEL] + [m for m in FALLBACK_MODELS if m != GEMINI_MODEL]
+    last_error = None
+    data = None
+
     async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(url, headers=headers, json=payload)
-        resp.raise_for_status()
-        data = resp.json()
+        for i, model in enumerate(models_to_try):
+            url = GEMINI_URL.format(model=model)
+            try:
+                resp = await client.post(url, headers=headers, json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+                if i > 0:
+                    logger.warning(
+                        "gemini_client: modele '%s' indisponible, bascule reussie sur '%s'",
+                        GEMINI_MODEL, model,
+                    )
+                break
+            except httpx.HTTPStatusError as e:
+                last_error = e
+                if e.response.status_code == 404 and i < len(models_to_try) - 1:
+                    logger.warning(
+                        "gemini_client: modele '%s' renvoie 404 (retire/renomme cote Google), "
+                        "on essaie le suivant: '%s'", model, models_to_try[i + 1],
+                    )
+                    continue
+                raise
+        else:
+            raise last_error
 
     try:
         candidates = data.get("candidates", [])
