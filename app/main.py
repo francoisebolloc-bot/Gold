@@ -25,7 +25,10 @@ from app.agents import run_all_agents, aggregate_votes, run_risk_agent
 from app.trade_manager import create_trade, get_active_trade, update_live_price
 from app.telegram_bot import handle_update, broadcast, broadcast_photo
 from app.weekly_briefing import generate_weekly_outlook, already_sent_this_week, mark_sent_this_week
-from app.market_data import build_market_snapshot, fetch_current_price, fetch_recent_candles
+from app.market_data import (
+    build_market_snapshot, fetch_current_price, fetch_recent_candles,
+    market_data_refresh_loop,
+)
 from app.chart import render_candlestick_chart
 
 import logging
@@ -105,6 +108,7 @@ async def _chart_broadcast_loop():
 
 @app.on_event("startup")
 async def start_background_tasks():
+    asyncio.create_task(market_data_refresh_loop())
     asyncio.create_task(_weekly_briefing_loop())
     asyncio.create_task(_price_tracking_loop())
     asyncio.create_task(_candle_analysis_loop())

@@ -15,9 +15,14 @@ TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
 # mais n'est plus la source de données principale — voir TWELVEDATA_API_KEY ci-dessous)
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
-# Source de données de marché gratuite (remplace TradingView, qui exige un plan payant
-# pour les webhooks). Clé gratuite sans carte bancaire sur https://twelvedata.com
-TWELVEDATA_API_KEY = os.environ.get("TWELVEDATA_API_KEY", "")
+# Source de données de marché gratuite et sans clé API : Yahoo Finance (GC=F,
+# futures Gold COMEX). Remplace TwelveData (limité à 8 req/min sur le plan
+# gratuit) et TradingView (webhooks payants) — voir app/market_data.py.
+
+# Intervalle (secondes) entre 2 rafraîchissements du buffer de bougies en
+# mémoire. C'est un simple appel HTTP (pas d'IA), donc peut être fréquent
+# sans coût ni risque de quota.
+MARKET_DATA_REFRESH_INTERVAL_SECONDS = int(os.environ.get("MARKET_DATA_REFRESH_INTERVAL_SECONDS", "15"))
 
 # Intervalle (secondes) entre 2 vérifications du prix en direct pour le suivi TP/SL
 # d'un trade déjà actif (léger : un seul prix, pas d'indicateurs).
@@ -49,7 +54,6 @@ REQUIRED_VARS = [
     "GEMINI_API_KEY",
     "TELEGRAM_BOT_TOKEN",
     "TELEGRAM_WEBHOOK_SECRET",
-    "TWELVEDATA_API_KEY",
 ]
 
 
