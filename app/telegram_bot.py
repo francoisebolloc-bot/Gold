@@ -55,6 +55,17 @@ async def send_message(chat_id: int, text: str, reply_markup: dict = None):
         return resp.json()
 
 
+async def send_photo(chat_id: int, photo_bytes: bytes, caption: str = None):
+    files = {"photo": ("chart.png", photo_bytes, "image/png")}
+    data = {"chat_id": chat_id}
+    if caption:
+        data["caption"] = caption
+        data["parse_mode"] = "HTML"
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(f"{TELEGRAM_API}/sendPhoto", data=data, files=files)
+        return resp.json()
+
+
 async def broadcast(text: str, reply_markup: dict = None):
     """Envoie un message à tous les abonnés. Retire automatiquement ceux qui ont bloqué le bot."""
     subs = load_subscribers()
@@ -62,6 +73,23 @@ async def broadcast(text: str, reply_markup: dict = None):
     for chat_id in subs:
         try:
             result = await send_message(chat_id, text, reply_markup)
+            if not result.get("ok") and result.get("error_code") in (403, 400):
+                dead.append(chat_id)
+        except Exception:
+            continue
+    if dead:
+        for chat_id in dead:
+            subs.discard(chat_id)
+        save_subscribers(subs)
+
+
+async def broadcast_photo(photo_bytes: bytes, caption: str = None):
+    """Envoie une photo à tous les abonnés. Retire automatiquement ceux qui ont bloqué le bot."""
+    subs = load_subscribers()
+    dead = []
+    for chat_id in subs:
+        try:
+            result = await send_photo(chat_id, photo_bytes, caption)
             if not result.get("ok") and result.get("error_code") in (403, 400):
                 dead.append(chat_id)
         except Exception:
