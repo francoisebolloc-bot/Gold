@@ -9,7 +9,10 @@ Routes :
 """
 from fastapi import FastAPI, Request, HTTPException
 import asyncio
-from app.config import WEBHOOK_SECRET, TELEGRAM_WEBHOOK_SECRET, MIN_CONSENSUS, check_config
+from app.config import (
+    WEBHOOK_SECRET, TELEGRAM_WEBHOOK_SECRET, MIN_CONSENSUS, check_config,
+    PRICE_TRACKING_INTERVAL_SECONDS, CANDLE_ANALYSIS_INTERVAL_SECONDS,
+)
 from app.security import (
     check_data_integrity,
     sanity_check_fields,
@@ -21,6 +24,7 @@ from app.agents import run_all_agents, aggregate_votes, run_risk_agent
 from app.trade_manager import create_trade, get_active_trade, update_live_price
 from app.telegram_bot import handle_update, broadcast
 from app.weekly_briefing import generate_weekly_outlook, already_sent_this_week, mark_sent_this_week
+from app.market_data import build_market_snapshot, fetch_current_price
 
 app = FastAPI(title="Gold Signals Bot")
 
@@ -41,9 +45,38 @@ async def _weekly_briefing_loop():
         await asyncio.sleep(3600)
 
 
+async def _price_tracking_loop():
+    """Toutes les PRICE_TRACKING_INTERVAL_SECONDS : si un trade est actif, va chercher
+    juste le dernier prix (léger) pour le suivi TP/SL en direct."""
+    while True:
+        try:
+            if get_active_trade():
+                price = await fetch_current_price()
+                await update_live_price(price)
+        except Exception:
+            pass  # Un raté ponctuel de l'API ne doit jamais faire planter le bot
+        await asyncio.sleep(PRICE_TRACKING_INTERVAL_SECONDS)
+
+
+async def _candle_analysis_loop():
+    """Toutes les CANDLE_ANALYSIS_INTERVAL_SECONDS : si aucun trade n'est actif, va
+    chercher l'historique de bougies + indicateurs et fait voter les 9 agents,
+    exactement comme le faisait auparavant le webhook TradingView."""
+    while True:
+        try:
+            if not get_active_trade():
+                snapshot = await build_market_snapshot()
+                await analyze_market_and_maybe_signal(snapshot)
+        except Exception:
+            pass  # Idem : jamais casser la boucle pour un échec ponctuel de l'API
+        await asyncio.sleep(CANDLE_ANALYSIS_INTERVAL_SECONDS)
+
+
 @app.on_event("startup")
 async def start_background_tasks():
     asyncio.create_task(_weekly_briefing_loop())
+    asyncio.create_task(_price_tracking_loop())
+    asyncio.create_task(_candle_analysis_loop())
 
 
 @app.get("/health")

@@ -11,7 +11,21 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
 
 # Secret dans l'URL du webhook TradingView -> /webhook/{secret}
+# (conservé pour compatibilité si un jour un abonnement payant TradingView est ajouté,
+# mais n'est plus la source de données principale — voir TWELVEDATA_API_KEY ci-dessous)
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
+
+# Source de données de marché gratuite (remplace TradingView, qui exige un plan payant
+# pour les webhooks). Clé gratuite sans carte bancaire sur https://twelvedata.com
+TWELVEDATA_API_KEY = os.environ.get("TWELVEDATA_API_KEY", "")
+
+# Intervalle (secondes) entre 2 vérifications du prix en direct pour le suivi TP/SL
+# d'un trade déjà actif (léger : un seul prix, pas d'indicateurs).
+PRICE_TRACKING_INTERVAL_SECONDS = int(os.environ.get("PRICE_TRACKING_INTERVAL_SECONDS", "20"))
+
+# Intervalle (secondes) entre 2 analyses complètes par les 9 agents quand aucun trade
+# n'est actif (récupère l'historique de bougies + indicateurs, donc plus coûteux).
+CANDLE_ANALYSIS_INTERVAL_SECONDS = int(os.environ.get("CANDLE_ANALYSIS_INTERVAL_SECONDS", "60"))
 
 # Fichier persistant (nécessite un Volume Railway monté sur /data)
 SUBSCRIBERS_FILE = os.environ.get("SUBSCRIBERS_FILE", "/data/subscribers.json")
@@ -30,8 +44,8 @@ LIVE_ANALYSIS_INTERVAL_SECONDS = int(os.environ.get("LIVE_ANALYSIS_INTERVAL_SECO
 REQUIRED_VARS = [
     "GEMINI_API_KEY",
     "TELEGRAM_BOT_TOKEN",
-    "WEBHOOK_SECRET",
     "TELEGRAM_WEBHOOK_SECRET",
+    "TWELVEDATA_API_KEY",
 ]
 
 
