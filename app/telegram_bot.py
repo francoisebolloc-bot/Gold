@@ -102,10 +102,17 @@ async def handle_update(update: dict):
             await send_message(chat_id, f"📊 <b>Contexte de la semaine sur l'or</b>\n\n{outlook}")
         except Exception:
             pass  # Le briefing est un bonus ; on ne bloque jamais l'inscription si ça échoue
+
+        try:
+            from app.trade_manager import format_trades_summary
+            await send_message(chat_id, format_trades_summary())
+        except Exception:
+            pass  # Idem : ne jamais bloquer l'inscription si l'affichage des trades échoue
+
         await send_message(
             chat_id,
             "Tu es abonné ✅ Tu recevras désormais les signaux automatiquement.\n\n"
-            "Commandes : /stop (se désabonner), /status (voir ton statut)",
+            "Commandes : /trades (voir les trades), /stop (se désabonner), /status (voir ton statut)",
         )
     elif text == "/stop":
         remove_subscriber(chat_id)
@@ -114,8 +121,11 @@ async def handle_update(update: dict):
         subs = load_subscribers()
         state = "abonné ✅" if chat_id in subs else "non abonné ❌"
         await send_message(chat_id, f"Statut : {state}")
+    elif text == "/trades":
+        from app.trade_manager import format_trades_summary
+        await send_message(chat_id, format_trades_summary())
     else:
-        await send_message(chat_id, "Commandes disponibles : /start, /stop, /status")
+        await send_message(chat_id, "Commandes disponibles : /start, /trades, /stop, /status")
 
 
 async def handle_callback(callback_query: dict):

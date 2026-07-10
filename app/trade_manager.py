@@ -53,6 +53,44 @@ def get_active_trade() -> dict | None:
     return None
 
 
+def _format_trade_line(t: dict) -> str:
+    direction_emoji = "🟢 ACHAT" if t["direction"] == "achat" else "🔴 VENTE"
+    status_label = {
+        STATUS_PROPOSED: "⏳ Proposé (en attente de confirmations)",
+        STATUS_ACTIVE: "📡 Actif (suivi en direct)",
+        STATUS_CLOSED: "✅ Clôturé",
+    }.get(t["status"], t["status"])
+    lines = [
+        f"<b>#{t['id']}</b> — {direction_emoji} — {status_label}",
+        f"Entrée : {t['entry']} | SL : {t['stop_loss']} | TP : {t['take_profit']}",
+    ]
+    if t["status"] == STATUS_CLOSED and "exit_price" in t:
+        lines.append(f"Sortie : {t['exit_price']}")
+    return "\n".join(lines)
+
+
+def format_trades_summary(limit_closed: int = 3) -> str:
+    """Construit un résumé lisible du trade actif + des derniers trades clôturés,
+    utilisé pour /start et /trades."""
+    trades = list(_load().values())
+    active = [t for t in trades if t["status"] in (STATUS_PROPOSED, STATUS_ACTIVE)]
+    closed = sorted(
+        [t for t in trades if t["status"] == STATUS_CLOSED],
+        key=lambda t: t.get("closed_at", 0),
+        reverse=True,
+    )[:limit_closed]
+
+    if not active and not closed:
+        return "📭 Aucun trade pour le moment. Tu seras notifié dès qu'un signal fort est détecté."
+
+    parts = []
+    if active:
+        parts.append("<b>🔥 Trade en cours</b>\n\n" + "\n\n".join(_format_trade_line(t) for t in active))
+    if closed:
+        parts.append("<b>📜 Derniers trades</b>\n\n" + "\n\n".join(_format_trade_line(t) for t in closed))
+    return "\n\n".join(parts)
+
+
 async def synthesize_signal_message(direction: str, entry: float, stop_loss: float,
                                      take_profit: float, agent_results: list,
                                      risk_result: dict) -> str:
