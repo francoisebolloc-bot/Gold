@@ -1,0 +1,134 @@
+"""
+Serveur principal FastAPI.
+
+Routes :
+- POST /webhook/{secret}          <- TradingView (alerte de clôture de bougie, XAUUSD)
+- POST /webhook/live/{secret}     <- TradingView (prix en direct, script léger)
+- POST /telegram/{secret}         <- Telegram (webhook des messages/commandes)
+- GET  /health                    <- vérification Railway
+"""
+from fastapi import FastAPI, Request, HTTPException
+from app.config import WEBHOOK_SECRET, TELEGRAM_WEBHOOK_SECRET, MIN_CONSENSUS, check_config
+from app.security import (
+    check_data_integrity,
+    sanity_check_fields,
+    webhook_limiter,
+    live_analysis_limiter,
+    telegram_webhook_limiter,
+)
+from app.agents import run_all_agents, aggregate_votes, run_risk_agent
+from app.trade_manager import create_trade, get_active_trade, update_live_price
+from app.telegram_bot import handle_update
+
+app = FastAPI(title="Gold Signals Bot")
+
+
+@app.get("/health")
+async def health():
+    missing = check_config()
+    return {"status": "ok" if not missing else "misconfigured", "missing_env_vars": missing}
+
+
+async def analyze_market_and_maybe_signal(market_data: dict) -> dict:
+    """Logique d'analyse partagée entre la bougie clôturée et la bougie en direct :
+    vérifie l'intégrité des données, fait voter les 9 agents, fait valider le risque,
+    et crée + diffuse un trade si le consensus est suffisant."""
+    ok, reason = sanity_check_fields(market_data)
+    if not ok:
+        return {"status": "rejected", "reason": reason}
+
+    integrity = await check_data_integrity(market_data)
+    if not integrity.get("coherent", False):
+        return {"status": "rejected", "reason": integrity.get("raison")}
+
+    if get_active_trade():
+        return {"status": "skipped", "reason": "Un trade est déjà actif sur XAUUSD"}
+
+    agent_results = await run_all_agents(market_data)
+    consensus = aggregate_votes(agent_results)
+
+    if consensus["direction"] == "neutre" or max(consensus["achat"], consensus["vente"]) < MIN_CONSENSUS:
+        return {"status": "no_signal", "consensus": consensus}
+
+    entry = float(market_data.get("close", 0))
+    atr = float(market_data.get("atr", entry * 0.003)) or entry * 0.003
+    if consensus["direction"] == "achat":
+        stop_loss = round(entry - 1.5 * atr, 2)
+        take_profit = round(entry + 3 * atr, 2)
+    else:
+        stop_loss = round(entry + 1.5 * atr, 2)
+        take_profit = round(entry - 3 * atr, 2)
+
+    proposed_trade = {"direction": consensus["direction"], "entry": entry,
+                       "stop_loss": stop_loss, "take_profit": take_profit}
+
+    risk_result = await run_risk_agent(market_data, proposed_trade)
+    if not risk_result.get("approuve", False):
+        return {"status": "blocked_by_risk", "consensus": consensus, "risk": risk_result}
+
+    trade = await create_trade(consensus["direction"], entry, stop_loss, take_profit,
+                                agent_results, risk_result)
+    return {"status": "signal_sent", "trade_id": trade["id"], "consensus": consensus}
+
+
+@app.post("/webhook/{secret}")
+async def tradingview_webhook(secret: str, request: Request):
+    """Bougie CLÔTURÉE (alert.pine) : analyse complète systématique, toujours déclenchée."""
+    if not WEBHOOK_SECRET or secret != WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Secret invalide")
+
+    if not webhook_limiter.allow(secret):
+        raise HTTPException(status_code=429, detail="Trop de requêtes")
+
+    market_data = await request.json()
+    return await analyze_market_and_maybe_signal(market_data)
+
+
+@app.post("/webhook/live/{secret}")
+async def tradingview_live_webhook(secret: str, request: Request):
+    """Bougie EN FORMATION (live_price.pine), envoyée en continu.
+
+    - Si un trade est actif : sert au suivi live (prix, TP/SL, points d'étape).
+    - Si aucun trade n'est actif : les 9 agents + agent risque analysent la bougie en
+      train de se former (via Claude AI) pour détecter un setup fort en avance, sans
+      attendre la clôture — mais throttlé (LIVE_ANALYSIS_INTERVAL_SECONDS) pour ne pas
+      multiplier les appels Claude à chaque tick.
+    """
+    if not WEBHOOK_SECRET or secret != WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Secret invalide")
+
+    data = await request.json()
+
+    active_trade = get_active_trade()
+    if active_trade:
+        try:
+            price = float(data.get("close", data.get("price")))
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="Prix manquant ou invalide")
+        await update_live_price(price)
+        return {"status": "live_tracking_updated"}
+
+    # Pas de trade actif : tentative d'analyse anticipée sur la bougie en formation
+    if not live_analysis_limiter.allow(WEBHOOK_SECRET):
+        return {"status": "throttled"}
+
+    if "rsi" not in data and "macd" not in data:
+        # Le tick ne contient que le prix (script minimal) : pas assez de données pour les agents
+        return {"status": "insufficient_data_for_live_analysis"}
+
+    result = await analyze_market_and_maybe_signal(data)
+    result["source"] = "live_candle"
+    return result
+
+
+@app.post("/telegram/{secret}")
+async def telegram_webhook(secret: str, request: Request):
+    if not TELEGRAM_WEBHOOK_SECRET or secret != TELEGRAM_WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Secret invalide")
+
+    if not telegram_webhook_limiter.allow("global"):
+        raise HTTPException(status_code=429, detail="Trop de requêtes")
+
+    update = await request.json()
+    await handle_update(update)
+    return {"status": "ok"}

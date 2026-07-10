@@ -1,0 +1,48 @@
+//@version=5
+indicator("Gold Signals Bot - Suivi + Analyse Live", overlay=true)
+
+// Envoie les données de la bougie EN FORMATION (pas encore clôturée), en continu.
+// Utilisé pour :
+//  - le suivi live d'un trade déjà actif (prix, TP/SL)
+//  - l'analyse anticipée par les 9 agents quand aucun trade n'est actif (le serveur throttle
+//    ces analyses via LIVE_ANALYSIS_INTERVAL_SECONDS pour limiter les coûts d'appel Claude)
+//
+// Configure l'alerte avec l'URL : https://TON-APP.up.railway.app/webhook/live/TON_WEBHOOK_SECRET
+// Condition d'alerte : "Once Per Bar" sur une unité de temps courte (ex: 1 min), PAS "Once Per Bar Close".
+
+rsiLen = input.int(14, "Longueur RSI")
+atrLen = input.int(14, "Longueur ATR")
+
+rsiValue = ta.rsi(close, rsiLen)
+[macdLine, signalLine, histLine] = ta.macd(close, 12, 26, 9)
+atrValue = ta.atr(atrLen)
+
+body        = math.abs(close - open)
+upperWick   = high - math.max(close, open)
+lowerWick   = math.min(close, open) - low
+
+body1       = math.abs(close[1] - open[1])
+upperWick1  = high[1] - math.max(close[1], open[1])
+lowerWick1  = math.min(close[1], open[1]) - low[1]
+
+body2       = math.abs(close[2] - open[2])
+upperWick2  = high[2] - math.max(close[2], open[2])
+lowerWick2  = math.min(close[2], open[2]) - low[2]
+
+volumeValue = nz(volume, 0)
+
+liveMessage = '{"symbol":"XAUUSD","time":"' + str.tostring(time) + '",' +
+     '"open":' + str.tostring(open) + ',"high":' + str.tostring(high) + ',' +
+     '"low":' + str.tostring(low) + ',"close":' + str.tostring(close) + ',' +
+     '"price":' + str.tostring(close) + ',' +
+     '"rsi":' + str.tostring(rsiValue) + ',"macd":' + str.tostring(macdLine) + ',' +
+     '"macd_signal":' + str.tostring(signalLine) + ',"macd_hist":' + str.tostring(histLine) + ',' +
+     '"atr":' + str.tostring(atrValue) + ',"volume":' + str.tostring(volumeValue) + ',' +
+     '"is_live_candle":true,' +
+     '"candles":[' +
+       '{"body":' + str.tostring(body) + ',"upper_wick":' + str.tostring(upperWick) + ',"lower_wick":' + str.tostring(lowerWick) + '},' +
+       '{"body":' + str.tostring(body1) + ',"upper_wick":' + str.tostring(upperWick1) + ',"lower_wick":' + str.tostring(lowerWick1) + '},' +
+       '{"body":' + str.tostring(body2) + ',"upper_wick":' + str.tostring(upperWick2) + ',"lower_wick":' + str.tostring(lowerWick2) + '}' +
+     ']}'
+
+alert(liveMessage, alert.freq_all)

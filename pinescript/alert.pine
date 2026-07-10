@@ -1,0 +1,43 @@
+//@version=5
+indicator("Gold Signals Bot - Alerte Bougie", overlay=true)
+
+// Ce script calcule les données envoyées au webhook à chaque clôture de bougie.
+// Configure l'alerte TradingView avec l'URL : https://TON-APP.up.railway.app/webhook/TON_WEBHOOK_SECRET
+// Condition d'alerte : "Once Per Bar Close"
+
+rsiLen = input.int(14, "Longueur RSI")
+atrLen = input.int(14, "Longueur ATR")
+
+rsiValue = ta.rsi(close, rsiLen)
+[macdLine, signalLine, histLine] = ta.macd(close, 12, 26, 9)
+atrValue = ta.atr(atrLen)
+
+// --- Analyse des mèches sur les 3 dernières bougies ---
+body        = math.abs(close - open)
+upperWick   = high - math.max(close, open)
+lowerWick   = math.min(close, open) - low
+
+body1       = math.abs(close[1] - open[1])
+upperWick1  = high[1] - math.max(close[1], open[1])
+lowerWick1  = math.min(close[1], open[1]) - low[1]
+
+body2       = math.abs(close[2] - open[2])
+upperWick2  = high[2] - math.max(close[2], open[2])
+lowerWick2  = math.min(close[2], open[2]) - low[2]
+
+volumeValue = nz(volume, 0)
+
+alertMessage = '{"symbol":"XAUUSD","time":"' + str.tostring(time) + '",' +
+     '"open":' + str.tostring(open) + ',"high":' + str.tostring(high) + ',' +
+     '"low":' + str.tostring(low) + ',"close":' + str.tostring(close) + ',' +
+     '"rsi":' + str.tostring(rsiValue) + ',"macd":' + str.tostring(macdLine) + ',' +
+     '"macd_signal":' + str.tostring(signalLine) + ',"macd_hist":' + str.tostring(histLine) + ',' +
+     '"atr":' + str.tostring(atrValue) + ',"volume":' + str.tostring(volumeValue) + ',' +
+     '"candles":[' +
+       '{"body":' + str.tostring(body) + ',"upper_wick":' + str.tostring(upperWick) + ',"lower_wick":' + str.tostring(lowerWick) + '},' +
+       '{"body":' + str.tostring(body1) + ',"upper_wick":' + str.tostring(upperWick1) + ',"lower_wick":' + str.tostring(lowerWick1) + '},' +
+       '{"body":' + str.tostring(body2) + ',"upper_wick":' + str.tostring(upperWick2) + ',"lower_wick":' + str.tostring(lowerWick2) + '}' +
+     ']}'
+
+if barstate.isconfirmed
+    alert(alertMessage, alert.freq_once_per_bar_close)
