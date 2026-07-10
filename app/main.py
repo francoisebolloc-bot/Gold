@@ -26,6 +26,10 @@ from app.telegram_bot import handle_update, broadcast
 from app.weekly_briefing import generate_weekly_outlook, already_sent_this_week, mark_sent_this_week
 from app.market_data import build_market_snapshot, fetch_current_price
 
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("gold-bot")
+
 app = FastAPI(title="Gold Signals Bot")
 
 
@@ -65,10 +69,13 @@ async def _candle_analysis_loop():
     while True:
         try:
             if not get_active_trade():
+                logger.info("candle_analysis_loop: fetching market snapshot...")
                 snapshot = await build_market_snapshot()
-                await analyze_market_and_maybe_signal(snapshot)
+                logger.info("candle_analysis_loop: snapshot=%s", snapshot)
+                result = await analyze_market_and_maybe_signal(snapshot)
+                logger.info("candle_analysis_loop: result=%s", result)
         except Exception:
-            pass  # Idem : jamais casser la boucle pour un échec ponctuel de l'API
+            logger.exception("candle_analysis_loop: échec du cycle d'analyse")
         await asyncio.sleep(CANDLE_ANALYSIS_INTERVAL_SECONDS)
 
 
