@@ -32,10 +32,14 @@ async def ask_ai(system_prompt: str, user_prompt: str, max_tokens: int = 600) ->
     """Appelle Gemini et retourne le texte brut de la réponse.
 
     Essaie GEMINI_MODEL, puis chaque modèle de FALLBACK_MODELS si le précédent
-    renvoie un 404 (modèle indisponible/retiré). Toute autre erreur (429, 500,
-    clé invalide, etc.) est immédiatement relancée sans essayer les fallbacks,
-    car changer de modèle ne résoudrait pas ces problèmes-là.
+    renvoie 404 (modèle retiré/renommé), 429 (quota épuisé — les quotas gratuits
+    Gemini sont appliqués par modèle, donc un autre modèle a de bonnes chances
+    d'avoir encore du quota disponible) ou une erreur serveur 5xx. Seules les
+    erreurs fatales et non liées au modèle (401/403 clé invalide, 400 requête
+    malformée) sont relancées immédiatement sans tenter les fallbacks.
     """
+    RETRYABLE_STATUS_CODES = {404, 429, 500, 502, 503, 504}
+
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY manquante dans les variables d'environnement")
 
@@ -65,10 +69,11 @@ async def ask_ai(system_prompt: str, user_prompt: str, max_tokens: int = 600) ->
                 break
             except httpx.HTTPStatusError as e:
                 last_error = e
-                if e.response.status_code == 404 and i < len(models_to_try) - 1:
+                status = e.response.status_code
+                if status in RETRYABLE_STATUS_CODES and i < len(models_to_try) - 1:
                     logger.warning(
-                        "gemini_client: modele '%s' renvoie 404 (retire/renomme cote Google), "
-                        "on essaie le suivant: '%s'", model, models_to_try[i + 1],
+                        "gemini_client: modele '%s' indisponible (HTTP %s), "
+                        "on essaie le suivant: '%s'", model, status, models_to_try[i + 1],
                     )
                     continue
                 raise
