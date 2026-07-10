@@ -27,6 +27,10 @@ PRICE_TRACKING_INTERVAL_SECONDS = int(os.environ.get("PRICE_TRACKING_INTERVAL_SE
 # n'est actif (récupère l'historique de bougies + indicateurs, donc plus coûteux).
 CANDLE_ANALYSIS_INTERVAL_SECONDS = int(os.environ.get("CANDLE_ANALYSIS_INTERVAL_SECONDS", "60"))
 
+# Intervalle (secondes) entre 2 envois du graphique du marché aux abonnés,
+# indépendamment de la détection d'un signal (suivi visuel continu).
+CHART_BROADCAST_INTERVAL_SECONDS = int(os.environ.get("CHART_BROADCAST_INTERVAL_SECONDS", "900"))
+
 # Fichier persistant (nécessite un Volume Railway monté sur /data)
 SUBSCRIBERS_FILE = os.environ.get("SUBSCRIBERS_FILE", "/data/subscribers.json")
 TRADES_FILE = os.environ.get("TRADES_FILE", "/data/trades.json")
