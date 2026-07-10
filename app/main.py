@@ -8,6 +8,7 @@ Routes :
 - GET  /health                    <- vérification Railway
 """
 from fastapi import FastAPI, Request, HTTPException
+import asyncio
 from app.config import WEBHOOK_SECRET, TELEGRAM_WEBHOOK_SECRET, MIN_CONSENSUS, check_config
 from app.security import (
     check_data_integrity,
@@ -18,9 +19,31 @@ from app.security import (
 )
 from app.agents import run_all_agents, aggregate_votes, run_risk_agent
 from app.trade_manager import create_trade, get_active_trade, update_live_price
-from app.telegram_bot import handle_update
+from app.telegram_bot import handle_update, broadcast
+from app.weekly_briefing import generate_weekly_outlook, already_sent_this_week, mark_sent_this_week
 
 app = FastAPI(title="Gold Signals Bot")
+
+
+async def _weekly_briefing_loop():
+    """Vérifie chaque heure si c'est le moment d'envoyer le briefing hebdomadaire
+    (une fois par semaine ISO, le lundi à partir de 8h UTC) à tous les abonnés."""
+    while True:
+        try:
+            now = __import__("time").gmtime()
+            is_monday_morning = now.tm_wday == 0 and now.tm_hour >= 8
+            if is_monday_morning and not already_sent_this_week():
+                outlook = await generate_weekly_outlook()
+                await broadcast(f"📊 <b>Contexte de la semaine sur l'or</b>\n\n{outlook}")
+                mark_sent_this_week()
+        except Exception:
+            pass  # Ne jamais casser le serveur pour un échec de briefing
+        await asyncio.sleep(3600)
+
+
+@app.on_event("startup")
+async def start_background_tasks():
+    asyncio.create_task(_weekly_briefing_loop())
 
 
 @app.get("/health")

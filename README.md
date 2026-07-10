@@ -94,7 +94,11 @@ la clôture de bougie. Le serveur limite automatiquement la fréquence de ces an
 
 ## 6. Utilisation
 
-- Chaque personne envoie `/start` au bot Telegram → elle est abonnée aux annonces de signaux.
+- Quand quelqu'un envoie `/start` au bot Telegram, il reçoit dans l'ordre : un message de
+  bienvenue, un aperçu du contexte du marché de l'or de la semaine, puis la confirmation
+  qu'il est bien abonné.
+- Ce même aperçu hebdomadaire est renvoyé automatiquement à **tous** les abonnés chaque
+  lundi matin (à partir de 8h UTC) — un rappel de contexte avant les signaux de la semaine.
 - Quand un signal fort est validé par les 9 agents + l'agent risque, un message est diffusé
   avec un bouton "✅ Confirmer / Suivre ce trade".
 - Seuls ceux qui cliquent reçoivent le suivi en direct (progression, invalidation, clôture TP/SL).

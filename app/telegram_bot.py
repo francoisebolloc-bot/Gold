@@ -89,12 +89,23 @@ async def handle_update(update: dict):
         add_subscriber(chat_id)
         await send_message(
             chat_id,
-            "✅ <b>Inscription confirmée.</b>\n\n"
-            "Tu recevras désormais les signaux de trading sur l'or (XAUUSD) générés par "
-            "nos 9 agents d'analyse + agent risque, propulsés par Gemini AI (gratuit) et TradingView.\n\n"
-            "Commandes disponibles :\n"
-            "/stop — se désabonner\n"
-            "/status — voir ton statut d'abonnement",
+            "👋 <b>Bienvenue !</b>\n\n"
+            "Je suis ton bot de signaux sur l'or (XAUUSD), propulsé par 9 agents d'analyse + "
+            "1 agent risque (Gemini AI) qui surveillent TradingView en direct.\n\n"
+            "Voici comment ça marche : je t'envoie un aperçu du marché chaque semaine, puis un "
+            "signal dès qu'un setup fort est détecté. Tu cliques sur \"Confirmer\" pour suivre "
+            "un trade précis, et je t'accompagne jusqu'à la clôture (take profit ou stop loss).",
+        )
+        try:
+            from app.weekly_briefing import generate_weekly_outlook
+            outlook = await generate_weekly_outlook()
+            await send_message(chat_id, f"📊 <b>Contexte de la semaine sur l'or</b>\n\n{outlook}")
+        except Exception:
+            pass  # Le briefing est un bonus ; on ne bloque jamais l'inscription si ça échoue
+        await send_message(
+            chat_id,
+            "Tu es abonné ✅ Tu recevras désormais les signaux automatiquement.\n\n"
+            "Commandes : /stop (se désabonner), /status (voir ton statut)",
         )
     elif text == "/stop":
         remove_subscriber(chat_id)
