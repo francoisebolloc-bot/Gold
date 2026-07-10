@@ -4,8 +4,8 @@ Aucun secret n'est jamais écrit en dur ici.
 """
 import os
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
@@ -24,11 +24,11 @@ SYMBOL = os.environ.get("SYMBOL", "XAUUSD")
 MIN_CONSENSUS = int(os.environ.get("MIN_CONSENSUS", "6"))
 
 # Intervalle minimum (secondes) entre 2 analyses complètes des agents sur la bougie en direct
-# (évite d'appeler Claude 9 fois à chaque tick, qui coûterait très cher et n'a pas de sens).
+# (évite d'appeler Gemini 9 fois à chaque tick, qui coûterait très cher et n'a pas de sens).
 LIVE_ANALYSIS_INTERVAL_SECONDS = int(os.environ.get("LIVE_ANALYSIS_INTERVAL_SECONDS", "20"))
 
 REQUIRED_VARS = [
-    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
     "TELEGRAM_BOT_TOKEN",
     "WEBHOOK_SECRET",
     "TELEGRAM_WEBHOOK_SECRET",

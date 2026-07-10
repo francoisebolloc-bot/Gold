@@ -1,7 +1,7 @@
 """
 2 agents de sécurité, indépendants des agents de trading :
 
-1. Agent Anti-Manipulation (via Claude) : vérifie que les données reçues du
+1. Agent Anti-Manipulation (via Gemini) : vérifie que les données reçues du
    webhook TradingView sont cohérentes (pas de valeurs aberrantes, pas de prix
    qui saute anormalement), pour éviter qu'une donnée corrompue ou une fausse
    alerte ne déclenche un signal envoyé à tous les abonnés.
@@ -12,7 +12,7 @@
 """
 import time
 from collections import defaultdict, deque
-from app.claude_client import ask_claude_json
+from app.gemini_client import ask_ai_json
 
 # ---------------------------------------------------------------------------
 # Agent 1 : Anti-Manipulation (cohérence des données de marché)
@@ -33,7 +33,7 @@ Réponds en JSON strict :
 async def check_data_integrity(market_data: dict) -> dict:
     prompt = f"Données reçues du webhook TradingView à vérifier :\n{market_data}"
     try:
-        result = await ask_claude_json(ANTI_MANIPULATION_SYSTEM, prompt, max_tokens=200)
+        result = await ask_ai_json(ANTI_MANIPULATION_SYSTEM, prompt, max_tokens=200)
         return result
     except Exception as e:
         # En cas d'échec de l'agent de sécurité lui-même, on bloque par prudence
@@ -41,7 +41,7 @@ async def check_data_integrity(market_data: dict) -> dict:
 
 
 def sanity_check_fields(market_data: dict) -> tuple[bool, str]:
-    """Vérification locale rapide, avant même d'appeler Claude (coûte 0 appel API)."""
+    """Vérification locale rapide, avant même d'appeler Gemini (coûte 0 appel API)."""
     try:
         high = float(market_data.get("high", 0))
         low = float(market_data.get("low", 0))
@@ -93,7 +93,7 @@ class RateLimiter:
 # Webhook TradingView : max 1 alerte toutes les 5 secondes par secret (anti-flood)
 webhook_limiter = RateLimiter(max_calls=1, window_seconds=5)
 
-# Analyse complète des 9 agents sur bougie en direct (non close) : throttlée, coûte cher en appels Claude
+# Analyse complète des 9 agents sur bougie en direct (non close) : throttlée, coûte cher en appels Gemini
 from app.config import LIVE_ANALYSIS_INTERVAL_SECONDS
 live_analysis_limiter = RateLimiter(max_calls=1, window_seconds=LIVE_ANALYSIS_INTERVAL_SECONDS)
 

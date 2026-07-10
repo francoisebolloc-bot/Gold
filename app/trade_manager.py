@@ -5,7 +5,7 @@ Gère le cycle de vie d'un trade Gold (XAUUSD) :
 2. Le message est diffusé à tous les abonnés avec un bouton "✅ Confirmer / Suivre ce trade".
 3. Seuls les abonnés qui cliquent sont ajoutés à la liste de suivi de CE trade.
 4. Le script Pine léger (live_price.pine) envoie le prix en direct toutes les X secondes
-   à /webhook/live/{secret} tant qu'un trade est actif ; l'Agent Suivi (via Claude) commente
+   à /webhook/live/{secret} tant qu'un trade est actif ; l'Agent Suivi (via Gemini) commente
    la progression et alerte en cas d'invalidation ou d'atteinte du take profit / stop loss.
 """
 import json
@@ -13,7 +13,7 @@ import os
 import time
 import uuid
 from app.config import TRADES_FILE
-from app.claude_client import ask_claude
+from app.gemini_client import ask_ai
 from app.telegram_bot import send_message, broadcast, load_subscribers
 
 STATUS_PROPOSED = "proposed"
@@ -56,7 +56,7 @@ def get_active_trade() -> dict | None:
 async def synthesize_signal_message(direction: str, entry: float, stop_loss: float,
                                      take_profit: float, agent_results: list,
                                      risk_result: dict) -> str:
-    """Fait rédiger par Claude un message de signal clair pour Telegram."""
+    """Fait rédiger par Gemini un message de signal clair pour Telegram."""
     votes_summary = "\n".join(
         f"- {r['agent_name']}: {r.get('vote')} ({r.get('confiance')}%) — {r.get('raison')}"
         for r in agent_results
@@ -78,7 +78,7 @@ Le message doit inclure : direction, niveaux (entrée/SL/TP), une synthèse en 2
 consensus des agents, et se terminer par une invitation à cliquer sur le bouton pour suivre le trade.
 Pas de scoring/liste brute des 9 agents dans le message, juste une synthèse.
 Précise que ce n'est pas un conseil financier et que chacun reste responsable de ses décisions."""
-    return await ask_claude(
+    return await ask_ai(
         "Tu rédiges des messages Telegram professionnels et concis pour un bot de signaux trading sur l'or.",
         prompt,
         max_tokens=500,
@@ -139,7 +139,7 @@ Prix actuel : {current_price}
 Contexte : {note}
 
 Rédige un point de suivi TRÈS court (1-2 phrases) en français pour Telegram, avec emoji, sur l'évolution du trade."""
-    return await ask_claude(
+    return await ask_ai(
         "Tu rédiges des points de suivi de trade ultra-courts pour Telegram.", prompt, max_tokens=150
     )
 
@@ -151,7 +151,7 @@ Direction: {trade['direction']}, Entrée: {trade['entry']}, Sortie: {exit_price}
 Résultat approximatif en points : {round(pnl_pips, 2)}
 
 Rédige un message de clôture court et honnête (en français, avec emoji adapté au résultat) pour Telegram."""
-    return await ask_claude(
+    return await ask_ai(
         "Tu rédiges des messages de clôture de trade honnêtes et concis pour Telegram.", prompt, max_tokens=200
     )
 

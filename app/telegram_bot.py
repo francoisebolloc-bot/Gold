@@ -91,7 +91,7 @@ async def handle_update(update: dict):
             chat_id,
             "✅ <b>Inscription confirmée.</b>\n\n"
             "Tu recevras désormais les signaux de trading sur l'or (XAUUSD) générés par "
-            "nos 9 agents d'analyse + agent risque, propulsés par Claude AI et TradingView.\n\n"
+            "nos 9 agents d'analyse + agent risque, propulsés par Gemini AI (gratuit) et TradingView.\n\n"
             "Commandes disponibles :\n"
             "/stop — se désabonner\n"
             "/status — voir ton statut d'abonnement",

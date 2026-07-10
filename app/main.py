@@ -90,9 +90,9 @@ async def tradingview_live_webhook(secret: str, request: Request):
 
     - Si un trade est actif : sert au suivi live (prix, TP/SL, points d'étape).
     - Si aucun trade n'est actif : les 9 agents + agent risque analysent la bougie en
-      train de se former (via Claude AI) pour détecter un setup fort en avance, sans
+      train de se former (via Gemini AI) pour détecter un setup fort en avance, sans
       attendre la clôture — mais throttlé (LIVE_ANALYSIS_INTERVAL_SECONDS) pour ne pas
-      multiplier les appels Claude à chaque tick.
+      multiplier les appels Gemini à chaque tick.
     """
     if not WEBHOOK_SECRET or secret != WEBHOOK_SECRET:
         raise HTTPException(status_code=403, detail="Secret invalide")

@@ -5,7 +5,7 @@ des mèches (wicks) des 3 dernières bougies, pour mieux juger le timing
 d'entrée (rejet de prix = mèche longue, continuation = mèche courte).
 """
 import asyncio
-from app.claude_client import ask_claude_json
+from app.gemini_client import ask_ai_json
 
 WICK_CONTEXT_INSTRUCTION = """
 Analyse aussi les mèches (wicks) des 3 dernières bougies fournies dans candles :
@@ -110,7 +110,7 @@ Analyse et donne ton vote selon ton domaine d'expertise."""
 
 async def run_agent(agent: dict, market_data: dict) -> dict:
     try:
-        result = await ask_claude_json(agent["system"], _build_user_prompt(market_data))
+        result = await ask_ai_json(agent["system"], _build_user_prompt(market_data))
         result["agent_id"] = agent["id"]
         result["agent_name"] = agent["name"]
         return result
@@ -134,7 +134,7 @@ Trade proposé :
 
 Évalue le ratio risque/rendement."""
     try:
-        result = await ask_claude_json(RISK_AGENT["system"], prompt)
+        result = await ask_ai_json(RISK_AGENT["system"], prompt)
         result["agent_id"] = "risque"
         result["agent_name"] = RISK_AGENT["name"]
         return result
