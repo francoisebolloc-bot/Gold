@@ -99,4 +99,9 @@ async def build_market_snapshot(interval: str = "1min", outputsize: int = 30) ->
     snapshot = dict(last)
     snapshot["rsi"] = compute_rsi(closes)
     snapshot["atr"] = compute_atr(candles)
+    # Historique récent (hors bougie courante) : sert de référence à l'agent
+    # anti-manipulation pour juger la cohérence du prix par rapport à la
+    # tendance réelle et récente, plutôt que par rapport à un niveau de prix
+    # mémorisé (et potentiellement obsolète) par le modèle.
+    snapshot["recent_closes"] = closes[-11:-1]
     return snapshot
